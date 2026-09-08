@@ -256,7 +256,11 @@ public class FirstCommentIndexService : IFirstCommentIndexService
 
                 try
                 {
-                    var ticketChunks = await IndexFirstCommentRowAsync(row, options.ProcessImages, cancellationToken);
+                    var ticketChunks = await IndexFirstCommentRowAsync(
+                        row,
+                        options.ProcessImages,
+                        options.ProcessedCommentTextForIndex,
+                        cancellationToken);
                     if (ticketChunks.Chunks == 0)
                     {
                         skipped++;
@@ -410,7 +414,11 @@ public class FirstCommentIndexService : IFirstCommentIndexService
 
         try
         {
-            var ticketResult = await IndexFirstCommentRowAsync(row, options.ProcessImages, cancellationToken);
+            var ticketResult = await IndexFirstCommentRowAsync(
+                row,
+                options.ProcessImages,
+                options.ProcessedCommentTextForIndex,
+                cancellationToken);
             if (ticketResult.Chunks == 0)
             {
                 return new FirstCommentIndexResult
@@ -456,23 +464,35 @@ public class FirstCommentIndexService : IFirstCommentIndexService
     private async Task<FirstCommentRowIndexResult> IndexFirstCommentRowAsync(
         TicketFirstCommentRow row,
         bool processImages,
+        string? processedCommentTextForIndex,
         CancellationToken cancellationToken)
     {
-        var commentContent = await _commentContentService.ToIndexableContentAsync(
-            row.Content,
-            new CommentContentRequest
+        CommentIndexableContent commentContent;
+        if (!string.IsNullOrWhiteSpace(processedCommentTextForIndex))
+        {
+            commentContent = new CommentIndexableContent
             {
-                ProcessImages = processImages,
-                ImageCacheMode = processImages
-                    ? ImageExtractionCacheMode.UseAndRefresh
-                    : ImageExtractionCacheMode.CacheOnly,
-                RefreshImageTextCache = processImages,
-                TicketId = row.TicketId,
-                TicketActionId = row.TicketActionId,
-                TeamSupportActionId = row.TeamSupportActionId,
-                TeamSupportTicketId = row.TeamSupportTicketId
-            },
-            cancellationToken);
+                Text = processedCommentTextForIndex.Trim()
+            };
+        }
+        else
+        {
+            commentContent = await _commentContentService.ToIndexableContentAsync(
+                row.Content,
+                new CommentContentRequest
+                {
+                    ProcessImages = processImages,
+                    ImageCacheMode = processImages
+                        ? ImageExtractionCacheMode.UseAndRefresh
+                        : ImageExtractionCacheMode.CacheOnly,
+                    RefreshImageTextCache = processImages,
+                    TicketId = row.TicketId,
+                    TicketActionId = row.TicketActionId,
+                    TeamSupportActionId = row.TeamSupportActionId,
+                    TeamSupportTicketId = row.TeamSupportTicketId
+                },
+                cancellationToken);
+        }
 
         var document = FirstCommentDocumentBuilder.Build(row, commentContent.Text);
         if (string.IsNullOrWhiteSpace(document))

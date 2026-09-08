@@ -268,6 +268,41 @@ public static class TicketHtmlHelper
         return string.IsNullOrWhiteSpace(html) ? string.Empty : TruncateHtmlBeforeFooter(html);
     }
 
+    /// <summary>
+    /// Filtra el comentario (firma, aviso legal, ruido de email) y devuelve texto plano.
+    /// </summary>
+    public static string FilterCommentPlainText(string? content) => ToPlainText(content);
+
+    /// <summary>
+    /// Omite las líneas «Texto extraído de imagen N:» del texto procesado, conservando el resto.
+    /// </summary>
+    public static string StripExtractedImageText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        var lines = text.Split('\n');
+        var kept = new List<string>(lines.Length);
+        foreach (var line in lines)
+        {
+            var trimmed = line.TrimEnd('\r');
+            if (ExtractedImageHeaderLineRegex.IsMatch(trimmed))
+            {
+                continue;
+            }
+
+            kept.Add(line);
+        }
+
+        return string.Join('\n', kept).Trim();
+    }
+
+    private static readonly Regex ExtractedImageHeaderLineRegex = new(
+        @"^\s*Texto extraído de imagen \d+:\s*$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
     public static string ToPlainText(string? content)
     {
         var html = PrepareCommentHtmlForIndexing(content);

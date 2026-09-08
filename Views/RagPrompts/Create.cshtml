@@ -1,0 +1,62 @@
+@model MoneyPenny.Models.Rag.RagPromptTemplate
+@{
+    ViewData["Title"] = "Nueva plantilla RAG";
+}
+
+<h2 class="mb-3">@ViewData["Title"]</h2>
+
+<div class="row">
+    <div class="col-lg-9">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <form asp-action="Create" method="post">
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label asp-for="Code" class="form-label">Código</label>
+                            <input asp-for="Code" class="form-control" />
+                            <span asp-validation-for="Code" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-5">
+                            <label asp-for="Name" class="form-label">Nombre</label>
+                            <input asp-for="Name" class="form-control" />
+                            <span asp-validation-for="Name" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-3">
+                            <label asp-for="SortOrder" class="form-label">Orden</label>
+                            <input asp-for="SortOrder" class="form-control" />
+                        </div>
+                    </div>
+
+                    <div class="form-check mt-3 mb-3">
+                        <input asp-for="IsActive" class="form-check-input" />
+                        <label asp-for="IsActive" class="form-check-label">Activa</label>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="SystemPrompt" class="form-label">Prompt system (base)</label>
+                        <textarea asp-for="SystemPrompt" class="form-control font-monospace small" rows="8"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="UserPromptTemplate" class="form-label">Plantilla user</label>
+                        <textarea asp-for="UserPromptTemplate" class="form-control font-monospace small" rows="10"></textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label asp-for="GenerationQuestion" class="form-label">Pregunta de generación</label>
+                        <textarea asp-for="GenerationQuestion" class="form-control" rows="2"></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Crear</button>
+                    <a asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

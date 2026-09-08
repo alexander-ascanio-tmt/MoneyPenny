@@ -1,3 +1,4 @@
+using MoneyPenny.Services.Rag.Prompts;
 using MoneyPenny.ViewModels.Rag;
 using MoneyPenny.ViewModels.Shared;
 
@@ -13,6 +14,16 @@ public class TicketRagViewModel
     public bool IsFirstCommentIndexed { get; init; }
     public bool HasGeneratedContext { get; init; }
     public string? IndexedFirstCommentContent { get; init; }
+    public string? ProcessedFirstCommentContent { get; set; }
+    public string? ProcessedCommentImageWarning { get; set; }
+    public IReadOnlyList<TicketIntentOptionViewModel> Intents { get; set; } = [];
+    public int? SelectedIntentId { get; set; }
+    public bool HasMessageBox { get; set; }
+    public bool HasAttachment { get; set; }
+    public string? MessageBoxDetail { get; set; }
+    public string? AttachmentDetail { get; set; }
+    public bool IsUrgent { get; set; }
+    public string? UrgencyReason { get; set; }
     public IReadOnlyList<RagContextItemViewModel> ContextItems { get; set; } = [];
     public string? ErrorMessage { get; init; }
 
@@ -29,5 +40,10 @@ public class TicketRagViewModel
     public TokenUsageEstimateViewModel? LastRunEstimate { get; set; }
     public ResponseGroundingReportViewModel? GroundingReport { get; set; }
     public GptTeamSupportActionViewModel? InsertedTeamSupportAction { get; set; }
+    public string? GptPromptTemplateCode { get; set; }
+    public bool GptIsAgentResponse => string.Equals(
+        GptPromptTemplateCode,
+        RagPromptResolver.AgentTemplateCode,
+        StringComparison.OrdinalIgnoreCase);
     public bool FocusGpt { get; set; }
 }

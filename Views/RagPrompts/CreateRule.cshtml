@@ -1,0 +1,63 @@
+@model MoneyPenny.Models.Rag.RagPromptSelectionRule
+@{
+    ViewData["Title"] = "Nueva regla";
+}
+
+<h2 class="mb-3">@ViewData["Title"]</h2>
+
+<div class="row">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <form asp-action="CreateRule" method="post">
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="Name" class="form-label">Nombre (opcional)</label>
+                        <input asp-for="Name" class="form-control" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="PromptTemplateId" class="form-label">Plantilla</label>
+                        <select asp-for="PromptTemplateId" class="form-select" asp-items="ViewBag.PromptTemplateId"></select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Priority" class="form-label">Prioridad</label>
+                        <input asp-for="Priority" class="form-control" />
+                        <div class="form-text">Mayor número = se evalúa antes.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="IsUrgent" class="form-label">Urgente</label>
+                        <select asp-for="IsUrgent" class="form-select">
+                            <option value="">Cualquiera</option>
+                            <option value="true">Sí (urgente)</option>
+                            <option value="false">No (normal)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="IntentCode" class="form-label">Código de intención</label>
+                        <select asp-for="IntentCode" class="form-select" asp-items="ViewBag.IntentCode">
+                            <option value="">Cualquiera</option>
+                        </select>
+                        <div class="form-text">Vacío = la regla aplica a cualquier intención.</div>
+                    </div>
+
+                    <div class="form-check mb-4">
+                        <input asp-for="IsActive" class="form-check-input" />
+                        <label asp-for="IsActive" class="form-check-label">Activa</label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Crear</button>
+                    <a asp-action="Rules" class="btn btn-outline-secondary">Cancelar</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

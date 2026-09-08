@@ -70,6 +70,51 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Tools" asp-action="Index">Herramientas</a>
                         </li>
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle text-dark" href="#" id="adminDropdown"
+                                   role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    Admin
+                                </a>
+                                <ul class="dropdown-menu" aria-labelledby="adminDropdown">
+                                    <li><h6 class="dropdown-header">Maestros</h6></li>
+                                    <li>
+                                        <a class="dropdown-item"
+                                           asp-area=""
+                                           asp-controller="RagPrompts"
+                                           asp-action="Index">
+                                            <i class="bi bi-chat-square-text me-1"></i>Prompts RAG
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item"
+                                           asp-area=""
+                                           asp-controller="Intents"
+                                           asp-action="Index">
+                                            <i class="bi bi-bullseye me-1"></i>Intenciones
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item"
+                                           asp-area=""
+                                           asp-controller="Urgency"
+                                           asp-action="Index">
+                                            <i class="bi bi-exclamation-triangle me-1"></i>Urgencia
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item"
+                                           asp-area=""
+                                           asp-controller="UserManagement"
+                                           asp-action="Index">
+                                            <i class="bi bi-people me-1"></i>Usuarios
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+                        }
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
                         </li>

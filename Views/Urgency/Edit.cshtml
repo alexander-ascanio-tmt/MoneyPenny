@@ -1,0 +1,88 @@
+@model MoneyPenny.Models.Rag.UrgencyRule
+
+
+
+@{
+
+    ViewData["Title"] = "Editar frase de urgencia";
+
+}
+
+
+
+<h2 class="mb-3">@ViewData["Title"]</h2>
+
+
+
+<div class="row">
+
+    <div class="col-md-7 col-lg-6">
+
+        <div class="card border-0 shadow-sm">
+
+            <div class="card-body">
+
+                <form asp-action="Edit" method="post">
+
+                    <input type="hidden" asp-for="Id" />
+
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+
+
+                    <div class="mb-3">
+
+                        <label asp-for="Phrase" class="form-label">Frase</label>
+
+                        <input asp-for="Phrase" class="form-control" />
+
+                        <span asp-validation-for="Phrase" class="text-danger"></span>
+
+                    </div>
+
+
+
+                    <div class="mb-3">
+
+                        <label asp-for="SortOrder" class="form-label">Orden</label>
+
+                        <input asp-for="SortOrder" class="form-control" />
+
+                        <span asp-validation-for="SortOrder" class="text-danger"></span>
+
+                    </div>
+
+
+
+                    <div class="form-check mb-4">
+
+                        <input asp-for="IsActive" class="form-check-input" />
+
+                        <label asp-for="IsActive" class="form-check-label">Activa</label>
+
+                    </div>
+
+
+
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+
+                    <a asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+@section Scripts {
+
+    <partial name="_ValidationScriptsPartial" />
+
+}
+

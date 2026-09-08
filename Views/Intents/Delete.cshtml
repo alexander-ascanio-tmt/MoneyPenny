@@ -1,0 +1,45 @@
+@model MoneyPenny.Models.Rag.TicketIntent
+
+@{
+    ViewData["Title"] = "Eliminar intención";
+    var assignmentCount = (int)(ViewBag.AssignmentCount ?? 0);
+}
+
+<h2 class="mb-3">@ViewData["Title"]</h2>
+
+<div class="card border-0 shadow-sm col-md-7 col-lg-6 p-0">
+    <div class="card-body">
+        <p class="mb-3">¿Seguro que quieres eliminar esta intención?</p>
+        <dl class="row mb-0">
+            <dt class="col-sm-4">Código</dt>
+            <dd class="col-sm-8"><code>@Model.Code</code></dd>
+            <dt class="col-sm-4">Nombre</dt>
+            <dd class="col-sm-8">@Model.Name</dd>
+            <dt class="col-sm-4">Asignaciones</dt>
+            <dd class="col-sm-8">@assignmentCount</dd>
+        </dl>
+
+        @if (assignmentCount > 0)
+        {
+            <div class="alert alert-warning mt-3 mb-0">
+                No se puede eliminar mientras tenga tickets asignados. Usa «Editar» y márcala como inactiva.
+            </div>
+        }
+        else
+        {
+            <form asp-action="Delete" method="post" class="mt-4">
+                <input type="hidden" asp-for="Id" />
+                <button type="submit" class="btn btn-danger">Eliminar</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
+            </form>
+        }
+
+        @if (assignmentCount > 0)
+        {
+            <div class="mt-3">
+                <a asp-action="Index" class="btn btn-outline-secondary">Volver</a>
+                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-outline-primary">Editar</a>
+            </div>
+        }
+    </div>
+</div>

@@ -2,64 +2,69 @@ using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using MoneyPenny.Options;
 using MoneyPenny.Services.Rag.Embeddings;
+using MoneyPenny.Services.Rag.Prompts;
 using Microsoft.Extensions.Options;
 
 namespace MoneyPenny.Services.Rag.Generation;
 
 public class OpenAiGenerationService : IGenerationService
 {
-    public const string PromptVersion = "v4-client-facing";
-
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IRagPromptResolver _promptResolver;
     private readonly RagOptions _options;
-    private readonly IWebHostEnvironment _environment;
     private readonly ILogger<OpenAiGenerationService> _logger;
 
     public OpenAiGenerationService(
         IHttpClientFactory httpClientFactory,
+        IRagPromptResolver promptResolver,
         IOptions<RagOptions> options,
-        IWebHostEnvironment environment,
         ILogger<OpenAiGenerationService> logger)
     {
         _httpClientFactory = httpClientFactory;
+        _promptResolver = promptResolver;
         _options = options.Value;
-        _environment = environment;
         _logger = logger;
     }
 
-    public async Task<string> GenerateAnswerAsync(
-        string question,
-        string context,
-        string? currentTicketNumber = null,
-        string? currentTicketFirstComment = null,
+    public async Task<GenerateAnswerResult> GenerateAnswerAsync(
+        GenerateAnswerRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(question))
+        if (string.IsNullOrWhiteSpace(request.Question))
         {
-            throw new ArgumentException("La pregunta no puede estar vacía.", nameof(question));
+            throw new ArgumentException("La pregunta no puede estar vacía.", nameof(request));
         }
 
-        if (string.IsNullOrWhiteSpace(currentTicketFirstComment))
+        if (string.IsNullOrWhiteSpace(request.CurrentTicketFirstComment))
         {
             throw new ArgumentException(
                 "El comentario #1 indexado del ticket actual es obligatorio para generar la respuesta.",
-                nameof(currentTicketFirstComment));
+                nameof(request));
         }
 
-        var systemPrompt = await LoadPromptFileAsync(_options.SystemPromptFile, cancellationToken);
-        var userPromptTemplate = await LoadPromptFileAsync(_options.TicketQaPromptFile, cancellationToken);
-        var userPrompt = userPromptTemplate
-            .Replace("{{ticketNumber}}", string.IsNullOrWhiteSpace(currentTicketNumber) ? "N/D" : currentTicketNumber.Trim(), StringComparison.Ordinal)
-            .Replace("{{currentTicketComment}}", currentTicketFirstComment.Trim(), StringComparison.Ordinal)
-            .Replace("{{context}}", string.IsNullOrWhiteSpace(context) ? "(Sin tickets similares recuperados)" : context, StringComparison.Ordinal)
-            .Replace("{{question}}", question.Trim(), StringComparison.Ordinal);
+        var resolved = await _promptResolver.ResolveAsync(
+            new RagPromptResolveRequest
+            {
+                TicketId = request.TicketId,
+                IsUrgent = request.IsUrgent,
+                IntentCode = request.IntentCode
+            },
+            cancellationToken);
+
+        var generationQuestion = resolved.GenerationQuestion;
+
+        var userPrompt = resolved.UserPromptTemplate
+            .Replace("{{ticketNumber}}", string.IsNullOrWhiteSpace(request.CurrentTicketNumber) ? "N/D" : request.CurrentTicketNumber.Trim(), StringComparison.Ordinal)
+            .Replace("{{currentTicketComment}}", request.CurrentTicketFirstComment.Trim(), StringComparison.Ordinal)
+            .Replace("{{context}}", string.IsNullOrWhiteSpace(request.Context) ? "(Sin tickets similares recuperados)" : request.Context, StringComparison.Ordinal)
+            .Replace("{{question}}", generationQuestion, StringComparison.Ordinal);
 
         var payload = new OpenAiChatRequest
         {
             Model = _options.ChatModel,
             Messages =
             [
-                new OpenAiChatMessage { Role = "system", Content = systemPrompt },
+                new OpenAiChatMessage { Role = "system", Content = resolved.SystemPrompt },
                 new OpenAiChatMessage { Role = "user", Content = userPrompt }
             ],
             Temperature = 0.2
@@ -91,22 +96,18 @@ public class OpenAiGenerationService : IGenerationService
         }
 
         _logger.LogInformation(
-            "Respuesta generada con modelo {Model} ({Length} caracteres).",
+            "Respuesta generada con modelo {Model}, prompt {PromptVersion} ({Length} caracteres).",
             _options.ChatModel,
+            resolved.PromptVersion,
             answer.Length);
 
-        return answer;
-    }
-
-    private async Task<string> LoadPromptFileAsync(string relativePath, CancellationToken cancellationToken)
-    {
-        var fullPath = Path.Combine(_environment.ContentRootPath, relativePath);
-        if (!File.Exists(fullPath))
+        return new GenerateAnswerResult
         {
-            throw new FileNotFoundException($"No se encontró el archivo de prompt: {fullPath}");
-        }
-
-        return await File.ReadAllTextAsync(fullPath, cancellationToken);
+            Answer = answer,
+            PromptVersion = resolved.PromptVersion,
+            TemplateCode = resolved.TemplateCode,
+            GenerationQuestion = generationQuestion
+        };
     }
 
     private sealed class OpenAiChatRequest

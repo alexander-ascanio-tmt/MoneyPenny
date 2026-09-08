@@ -62,6 +62,7 @@ public class TicketRagProcessService : ITicketRagProcessService
             var indexResult = await _ingestionService.IndexTicketAsync(
                 ticket.Id,
                 effectiveProcessImages,
+                processedFirstCommentTextForIndex: null,
                 cancellationToken);
 
             var ragResponse = await _ragOrchestrator.ProcessTicketAsync(

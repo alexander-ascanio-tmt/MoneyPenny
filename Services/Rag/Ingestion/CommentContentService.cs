@@ -134,8 +134,8 @@ public class CommentContentService : ICommentContentService
         if (missingEntries.Length > 0 && request.ImageCacheMode == ImageExtractionCacheMode.CacheOnly)
         {
             warning = missingEntries.Length == imageEntries.Length
-                ? "El texto de la imagen no está en caché. Indexa el ticket con 'Procesar con tokens' para extraerlo."
-                : $"Faltan {missingEntries.Length} imagen(es) en caché. Indexa el ticket con 'Procesar con tokens' para extraerlas.";
+                ? "El texto de la imagen no está en caché. Usa «Procesar comentario» para extraerlo."
+                : $"Faltan {missingEntries.Length} imagen(es) en caché. Usa «Procesar comentario» para extraerlas.";
         }
 
         if (!string.IsNullOrWhiteSpace(extractionWarning))

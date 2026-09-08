@@ -1,0 +1,19 @@
+@model MoneyPenny.Models.Rag.RagPromptTemplate
+@{
+    ViewData["Title"] = "Eliminar plantilla RAG";
+    var ruleCount = (int)(ViewBag.RuleCount ?? 0);
+}
+
+<h2 class="mb-3">@ViewData["Title"]</h2>
+
+<div class="card border-0 shadow-sm col-lg-6 p-0">
+    <div class="card-body">
+        <p>¿Eliminar la plantilla <strong>@Model.Name</strong> (<code>@Model.Code</code>)?</p>
+        <p class="text-muted small">Reglas asociadas: @ruleCount</p>
+        <form asp-action="Delete" method="post" class="mt-3">
+            <input type="hidden" asp-for="Id" />
+            <button type="submit" class="btn btn-danger">Eliminar</button>
+            <a asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
+        </form>
+    </div>
+</div>

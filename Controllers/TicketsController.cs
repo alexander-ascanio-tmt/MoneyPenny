@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MoneyPenny.Helpers;
 using MoneyPenny.Data.Repositories;
 using MoneyPenny.Models.Rag;
 using MoneyPenny.Models.Tickets;
@@ -11,6 +12,7 @@ using MoneyPenny.Services.Rag;
 using MoneyPenny.Services.Rag.Ingestion;
 using MoneyPenny.Services.Rag.Pricing;
 using MoneyPenny.Services.Rag.Validation;
+using MoneyPenny.Services.Rag.Prompts;
 using MoneyPenny.Services.TeamSupport;
 using MoneyPenny.Services.Tickets;
 using MoneyPenny.ViewModels.Rag;
@@ -24,7 +26,15 @@ namespace MoneyPenny.Controllers;
 public class TicketsController : Controller
 {
     private readonly ITicketService _ticketService;
+    private readonly ITicketIntentService _ticketIntentService;
+    private readonly ITicketCommentSignalsService _ticketCommentSignalsService;
+    private readonly ITicketCommentSignalDetectionService _ticketCommentSignalDetectionService;
+    private readonly ITicketUrgencyService _ticketUrgencyService;
+    private readonly ITicketUrgencyDetectionService _ticketUrgencyDetectionService;
+    private readonly ITicketIntentDetectionService _ticketIntentDetectionService;
+    private readonly ITicketProcessedCommentService _ticketProcessedCommentService;
     private readonly ITicketIngestionService _ingestionService;
+    private readonly ICommentContentService _commentContentService;
     private readonly ITeamSupportAttachmentService _attachmentService;
     private readonly ICommentImageOcrService _commentImageOcrService;
     private readonly ICommentImageMessageBoxService _commentImageMessageBoxService;
@@ -40,7 +50,15 @@ public class TicketsController : Controller
 
     public TicketsController(
         ITicketService ticketService,
+        ITicketIntentService ticketIntentService,
+        ITicketCommentSignalsService ticketCommentSignalsService,
+        ITicketCommentSignalDetectionService ticketCommentSignalDetectionService,
+        ITicketUrgencyService ticketUrgencyService,
+        ITicketUrgencyDetectionService ticketUrgencyDetectionService,
+        ITicketIntentDetectionService ticketIntentDetectionService,
+        ITicketProcessedCommentService ticketProcessedCommentService,
         ITicketIngestionService ingestionService,
+        ICommentContentService commentContentService,
         ITeamSupportAttachmentService attachmentService,
         ICommentImageOcrService commentImageOcrService,
         ICommentImageMessageBoxService commentImageMessageBoxService,
@@ -55,7 +73,15 @@ public class TicketsController : Controller
         IOptions<RagOptions> ragOptions)
     {
         _ticketService = ticketService;
+        _ticketIntentService = ticketIntentService;
+        _ticketCommentSignalsService = ticketCommentSignalsService;
+        _ticketCommentSignalDetectionService = ticketCommentSignalDetectionService;
+        _ticketUrgencyService = ticketUrgencyService;
+        _ticketUrgencyDetectionService = ticketUrgencyDetectionService;
+        _ticketIntentDetectionService = ticketIntentDetectionService;
+        _ticketProcessedCommentService = ticketProcessedCommentService;
         _ingestionService = ingestionService;
+        _commentContentService = commentContentService;
         _attachmentService = attachmentService;
         _commentImageOcrService = commentImageOcrService;
         _commentImageMessageBoxService = commentImageMessageBoxService;
@@ -139,6 +165,66 @@ public class TicketsController : Controller
         }
 
         model.FocusGpt = focusGpt;
+        try
+        {
+            model.Intents = await _ticketIntentService.GetActiveIntentsAsync(cancellationToken);
+            model.SelectedIntentId = await _ticketIntentService.GetAssignedIntentIdAsync(id, cancellationToken);
+        }
+        catch
+        {
+            model.Intents = [];
+            model.SelectedIntentId = null;
+        }
+
+        try
+        {
+            var signals = await _ticketCommentSignalsService.GetAsync(id, cancellationToken);
+            if (signals is not null)
+            {
+                model.HasMessageBox = signals.HasMessageBox;
+                model.HasAttachment = signals.HasAttachment;
+                model.MessageBoxDetail = signals.MessageBoxDetail;
+                model.AttachmentDetail = signals.AttachmentDetail;
+            }
+        }
+        catch
+        {
+            model.HasMessageBox = false;
+            model.HasAttachment = false;
+            model.MessageBoxDetail = null;
+            model.AttachmentDetail = null;
+        }
+
+        try
+        {
+            var urgency = await _ticketUrgencyService.GetAsync(id, cancellationToken);
+            if (urgency is not null)
+            {
+                model.IsUrgent = urgency.IsUrgent;
+                model.UrgencyReason = urgency.Reason;
+            }
+        }
+        catch
+        {
+            model.IsUrgent = false;
+            model.UrgencyReason = null;
+        }
+
+        try
+        {
+            var processedComment = await _ticketProcessedCommentService.GetAsync(id, cancellationToken);
+            if (processedComment is not null)
+            {
+                model.ProcessedFirstCommentContent = processedComment.ProcessedText;
+                model.ProcessedCommentImageWarning = processedComment.ImageExtractionWarning;
+            }
+        }
+        catch
+        {
+            model.ProcessedFirstCommentContent = null;
+            model.ProcessedCommentImageWarning = null;
+        }
+
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.Identity?.Name ?? "anonymous";
 
         if (!string.IsNullOrWhiteSpace(gptResult))
@@ -195,6 +281,208 @@ public class TicketsController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AssignIntent(
+        int ticketId,
+        string? ticketNumber,
+        int? intentId,
+        CancellationToken cancellationToken = default)
+    {
+        if (ticketId <= 0)
+        {
+            return BadRequest(new { success = false, error = "TicketId inválido." });
+        }
+
+        try
+        {
+            await _ticketIntentService.AssignAsync(
+                ticketId,
+                ticketNumber,
+                intentId,
+                cancellationToken: cancellationToken);
+            return Json(new { success = true, intentId });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { success = false, error = ex.Message });
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ProcessComment(
+        int ticketId,
+        CancellationToken cancellationToken = default)
+    {
+        if (ticketId <= 0)
+        {
+            return BadRequest(new { success = false, error = "TicketId inválido." });
+        }
+
+        var ticket = await _ticketService.GetRagDetailAsync(ticketId, cancellationToken);
+        if (ticket?.FirstComment is null || string.IsNullOrWhiteSpace(ticket.FirstComment.Content))
+        {
+            return BadRequest(new { success = false, error = "El ticket no tiene comentario #1 con contenido." });
+        }
+
+        var commentContent = await _commentContentService.ToIndexableContentAsync(
+            ticket.FirstComment.Content,
+            new CommentContentRequest
+            {
+                ProcessImages = true,
+                ImageCacheMode = ImageExtractionCacheMode.UseAndRefresh,
+                RefreshImageTextCache = true,
+                TicketId = ticketId,
+                TicketActionId = ticket.FirstComment.Id,
+                TeamSupportActionId = ticket.FirstComment.TeamSupportActionId,
+                TeamSupportTicketId = ticket.TeamSupportId
+            },
+            cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(commentContent.Text))
+        {
+            return BadRequest(new { success = false, error = "Tras procesar el comentario no quedó texto utilizable." });
+        }
+
+        await DetectCommentClassificationAsync(
+            ticketId,
+            ticket.Number,
+            ticket.FirstComment,
+            ticket.TeamSupportId,
+            commentContent.Text,
+            cancellationToken);
+
+        try
+        {
+            await _ticketProcessedCommentService.SaveAsync(
+                ticketId,
+                ticket.FirstComment.Id,
+                ticket.Number,
+                commentContent.Text,
+                commentContent.ImagesDetected,
+                commentContent.ImagesExtracted,
+                commentContent.ImageExtractionWarning,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { success = false, error = $"El comentario se procesó pero no se pudo guardar: {ex.Message}" });
+        }
+
+        TicketCommentSignals? signals = null;
+        int? intentId = null;
+        bool isUrgent = false;
+        string? urgencyReason = null;
+
+        try
+        {
+            signals = await _ticketCommentSignalsService.GetAsync(ticketId, cancellationToken);
+        }
+        catch
+        {
+            // Sin mensaje en UI si falla la lectura de señales.
+        }
+
+        try
+        {
+            intentId = await _ticketIntentService.GetAssignedIntentIdAsync(ticketId, cancellationToken);
+        }
+        catch
+        {
+            // Sin mensaje en UI si falla la lectura de intención.
+        }
+
+        try
+        {
+            var urgency = await _ticketUrgencyService.GetAsync(ticketId, cancellationToken);
+            if (urgency is not null)
+            {
+                isUrgent = urgency.IsUrgent;
+                urgencyReason = urgency.Reason;
+            }
+        }
+        catch
+        {
+            // Sin mensaje en UI si falla la lectura de urgencia.
+        }
+
+        return Json(new
+        {
+            success = true,
+            filteredText = commentContent.Text,
+            imagesDetected = commentContent.ImagesDetected,
+            imagesExtracted = commentContent.ImagesExtracted,
+            warning = commentContent.ImageExtractionWarning,
+            hasMessageBox = signals?.HasMessageBox ?? false,
+            hasAttachment = signals?.HasAttachment ?? false,
+            messageBoxDetail = signals?.MessageBoxDetail,
+            attachmentDetail = signals?.AttachmentDetail,
+            intentId,
+            isUrgent,
+            urgencyReason
+        });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AssignSignals(
+        int ticketId,
+        string? ticketNumber,
+        bool hasMessageBox,
+        bool hasAttachment,
+        CancellationToken cancellationToken = default)
+    {
+        if (ticketId <= 0)
+        {
+            return BadRequest(new { success = false, error = "TicketId inválido." });
+        }
+
+        try
+        {
+            await _ticketCommentSignalsService.SaveAsync(
+                ticketId,
+                ticketNumber,
+                hasMessageBox,
+                hasAttachment,
+                cancellationToken);
+            return Json(new { success = true, hasMessageBox, hasAttachment });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { success = false, error = ex.Message });
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AssignUrgency(
+        int ticketId,
+        string? ticketNumber,
+        bool isUrgent,
+        CancellationToken cancellationToken = default)
+    {
+        if (ticketId <= 0)
+        {
+            return BadRequest(new { success = false, error = "TicketId inválido." });
+        }
+
+        try
+        {
+            await _ticketUrgencyService.SaveAsync(
+                ticketId,
+                ticketNumber,
+                isUrgent,
+                classifierVersion: TicketUrgencyService.ManualClassifierVersion,
+                cancellationToken: cancellationToken);
+            return Json(new { success = true, isUrgent });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { success = false, error = ex.Message });
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ConsultGptAnswer(
         int ticketId,
         string? ticketNumber,
@@ -214,7 +502,7 @@ public class TicketsController : Controller
         if (!ticket.IsFirstCommentIndexed)
         {
             TempData["WarningMessage"] =
-                "El comentario #1 de este ticket aún no está indexado. Usa «Indexar ticket» antes de generar la respuesta GPT.";
+                "El comentario #1 de este ticket aún no está indexado. Usa «Indexar comentario» antes de generar la respuesta GPT.";
             return RedirectToAction(nameof(Rag), new { id = ticketId });
         }
 
@@ -300,6 +588,7 @@ public class TicketsController : Controller
         model.LastRunEstimate = response.LastRunEstimate;
         model.GroundingReport = response.GroundingReport;
         model.InsertedTeamSupportAction = response.InsertedTeamSupportAction;
+        model.GptPromptTemplateCode = response.GptPromptTemplateCode;
         if (response.ContextItems.Count > 0 && model.HasGeneratedContext)
         {
             model.ContextItems = response.ContextItems;
@@ -350,6 +639,7 @@ public class TicketsController : Controller
             model.GptAnswerSavedAt = log.CreatedAt;
             model.GptTeamSupportActionId = log.TeamSupportActionId;
             model.GptTeamSupportActionInserted = !string.IsNullOrWhiteSpace(log.TeamSupportActionId);
+            model.GptPromptTemplateCode = ParsePromptTemplateCode(log.PromptVersion);
         }
         catch
         {
@@ -508,7 +798,7 @@ public class TicketsController : Controller
         if (!ticket.IsFirstCommentIndexed)
         {
             TempData["WarningMessage"] =
-                "El comentario #1 de este ticket aún no está indexado. Usa «Indexar ticket» para vectorizarlo antes de generar el contexto.";
+                "El comentario #1 de este ticket aún no está indexado. Usa «Indexar comentario» para vectorizarlo antes de generar el contexto.";
             return RedirectToAction(nameof(Rag), new { id });
         }
 
@@ -749,47 +1039,144 @@ public class TicketsController : Controller
         string? returnTo = null,
         CancellationToken cancellationToken = default)
     {
-        var result = await _ingestionService.IndexTicketAsync(id, processImages, cancellationToken);
+        if (string.Equals(returnTo, nameof(Rag), StringComparison.OrdinalIgnoreCase))
+        {
+            processImages = false;
+            var processedComment = await _ticketProcessedCommentService.GetAsync(id, cancellationToken);
+            if (processedComment is null || string.IsNullOrWhiteSpace(processedComment.ProcessedText))
+            {
+                TempData["WarningMessage"] =
+                    "Procesa el comentario antes de indexarlo. Usa «Procesar comentario» en el apartado correspondiente.";
+                return RedirectToAction(nameof(Rag), new { id });
+            }
 
-        if (result.ProcessImages && result.ImagesDetected > 0 && result.ImagesExtracted == 0)
+            var indexText = TicketHtmlHelper.StripExtractedImageText(processedComment.ProcessedText);
+            if (string.IsNullOrWhiteSpace(indexText))
+            {
+                TempData["WarningMessage"] =
+                    "Tras preparar el comentario procesado no quedó contenido indexable. Revisa el apartado «Comentario procesado».";
+                return RedirectToAction(nameof(Rag), new { id });
+            }
+
+            var result = await _ingestionService.IndexTicketAsync(
+                id,
+                processImages: false,
+                processedFirstCommentTextForIndex: indexText,
+                cancellationToken: cancellationToken);
+
+            TempData["SuccessMessage"] = $"Ticket {id} indexado correctamente ({result.ChunkCount} fragmentos).";
+            return RedirectToAction(nameof(Rag), new { id });
+        }
+
+        var defaultResult = await _ingestionService.IndexTicketAsync(id, processImages, cancellationToken: cancellationToken);
+
+        if (defaultResult.ProcessImages && defaultResult.ImagesDetected > 0 && defaultResult.ImagesExtracted == 0)
         {
             if (string.IsNullOrWhiteSpace(_teamSupportOptions.AttachmentCookie)
                 && string.IsNullOrWhiteSpace(_teamSupportOptions.AttachmentBearerToken))
             {
                 TempData["WarningMessage"] =
-                    $"Ticket {id} indexado, pero no se pudo extraer texto de {result.ImagesDetected} imagen(es). " +
+                    $"Ticket {id} indexado, pero no se pudo extraer texto de {defaultResult.ImagesDetected} imagen(es). " +
                     "Configura ExternalApis:TeamSupport:AttachmentCookie en appsettings.Development.json.";
             }
             else
             {
-                var detail = string.IsNullOrWhiteSpace(result.ImageExtractionWarning)
+                var detail = string.IsNullOrWhiteSpace(defaultResult.ImageExtractionWarning)
                     ? "La cookie de TeamSupport puede haber caducado: renueva la sesión en el navegador, copia de nuevo las cookies y reinicia la app."
-                    : result.ImageExtractionWarning;
+                    : defaultResult.ImageExtractionWarning;
 
                 TempData["WarningMessage"] =
-                    $"Ticket {id} indexado, pero no se pudo extraer texto de {result.ImagesDetected} imagen(es). {detail}";
+                    $"Ticket {id} indexado, pero no se pudo extraer texto de {defaultResult.ImagesDetected} imagen(es). {detail}";
             }
         }
-        else if (result.ProcessImages && result.ImagesExtracted > 0)
+        else if (defaultResult.ProcessImages && defaultResult.ImagesExtracted > 0)
         {
             TempData["SuccessMessage"] =
-                $"Ticket {id} indexado con texto extraído de {result.ImagesExtracted} imagen(es).";
+                $"Ticket {id} indexado con texto extraído de {defaultResult.ImagesExtracted} imagen(es).";
         }
-        else if (!result.ProcessImages && result.ImagesDetected > 0)
+        else if (!defaultResult.ProcessImages && defaultResult.ImagesDetected > 0)
         {
             TempData["SuccessMessage"] =
-                $"Ticket {id} indexado sin procesar {result.ImagesDetected} imagen(es) del comentario.";
+                $"Ticket {id} indexado sin procesar {defaultResult.ImagesDetected} imagen(es) del comentario.";
         }
         else
         {
-            TempData["SuccessMessage"] = $"Ticket {id} indexado correctamente ({result.ChunkCount} fragmentos).";
-        }
-
-        if (string.Equals(returnTo, nameof(Rag), StringComparison.OrdinalIgnoreCase))
-        {
-            return RedirectToAction(nameof(Rag), new { id });
+            TempData["SuccessMessage"] = $"Ticket {id} indexado correctamente ({defaultResult.ChunkCount} fragmentos).";
         }
 
         return RedirectToAction(nameof(Details), new { id });
+    }
+
+    private static string? ParsePromptTemplateCode(string? promptVersion)
+    {
+        if (string.IsNullOrWhiteSpace(promptVersion))
+        {
+            return null;
+        }
+
+        var separator = promptVersion.IndexOf('+');
+        return separator > 0
+            ? promptVersion[..separator]
+            : promptVersion;
+    }
+
+    private async Task DetectCommentClassificationAsync(
+        int ticketId,
+        string? ticketNumber,
+        TicketActionViewModel firstComment,
+        string? teamSupportTicketId,
+        string filteredCommentText,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _ticketCommentSignalDetectionService.DetectAndSaveAsync(
+                ticketId,
+                ticketNumber,
+                firstComment,
+                teamSupportTicketId,
+                cancellationToken);
+        }
+        catch
+        {
+            // Sin mensaje en UI si falla la detección automática.
+        }
+
+        TicketCommentSignals? detectedSignals = null;
+        try
+        {
+            detectedSignals = await _ticketCommentSignalsService.GetAsync(ticketId, cancellationToken);
+        }
+        catch
+        {
+            // Sin mensaje en UI si falla la lectura de señales.
+        }
+
+        try
+        {
+            await _ticketIntentDetectionService.DetectAndSaveAsync(
+                ticketId,
+                ticketNumber,
+                firstComment.Content,
+                detectedSignals?.MessageBoxDetail,
+                cancellationToken);
+        }
+        catch
+        {
+            // Sin mensaje en UI si falla la detección de intención.
+        }
+
+        try
+        {
+            await _ticketUrgencyDetectionService.DetectFromPhrasesAndSaveAsync(
+                ticketId,
+                ticketNumber,
+                filteredCommentText,
+                cancellationToken);
+        }
+        catch
+        {
+            // Sin mensaje en UI si falla la detección de urgencia.
+        }
     }
 }

@@ -42,13 +42,14 @@ public class TicketIngestionService : ITicketIngestionService
         bool processImages = true,
         CancellationToken cancellationToken = default)
     {
-        var (document, _) = await BuildTicketDocumentInternalAsync(ticket, processImages, cancellationToken);
+        var (document, _) = await BuildTicketDocumentInternalAsync(ticket, processImages, null, cancellationToken);
         return document;
     }
 
     public async Task<TicketIndexResult> IndexTicketAsync(
         int ticketId,
         bool processImages = true,
+        string? processedFirstCommentTextForIndex = null,
         CancellationToken cancellationToken = default)
     {
         var ticket = await _ticketRepository.GetByIdAsync(ticketId, cancellationToken)
@@ -57,6 +58,7 @@ public class TicketIngestionService : ITicketIngestionService
         var (document, commentContent) = await BuildTicketDocumentInternalAsync(
             ticket,
             processImages,
+            processedFirstCommentTextForIndex,
             cancellationToken);
 
         await _vectorRepository.DeleteTicketIndexAsync(ticketId, cancellationToken);
@@ -83,7 +85,7 @@ public class TicketIngestionService : ITicketIngestionService
 
         await _vectorRepository.SaveEmbeddingsAsync(embeddings, cancellationToken);
 
-        await SyncFirstCommentIndexAsync(ticket, processImages, cancellationToken);
+        await SyncFirstCommentIndexAsync(ticket, processImages, processedFirstCommentTextForIndex, cancellationToken);
 
         _logger.LogInformation(
             "Ticket {TicketId} indexado con {ChunkCount} chunks (processImages={ProcessImages}, images={ImagesExtracted}/{ImagesDetected}).",
@@ -106,6 +108,7 @@ public class TicketIngestionService : ITicketIngestionService
     private async Task<(string Document, CommentIndexableContent CommentContent)> BuildTicketDocumentInternalAsync(
         Ticket ticket,
         bool processImages,
+        string? processedFirstCommentTextForIndex,
         CancellationToken cancellationToken)
     {
         var document = new StringBuilder();
@@ -124,19 +127,29 @@ public class TicketIngestionService : ITicketIngestionService
 
         if (oldestComment is not null)
         {
-            commentContent = await _commentContentService.ToIndexableContentAsync(
-                oldestComment.Content,
-                new CommentContentRequest
+            if (!string.IsNullOrWhiteSpace(processedFirstCommentTextForIndex))
+            {
+                commentContent = new CommentIndexableContent
                 {
-                    ProcessImages = processImages,
-                    ImageCacheMode = ImageExtractionCacheMode.UseAndRefresh,
-                    RefreshImageTextCache = processImages,
-                    TicketId = ticket.Id,
-                    TicketActionId = oldestComment.Id,
-                    TeamSupportActionId = oldestComment.TeamSupportActionId,
-                    TeamSupportTicketId = ticket.TeamSupportId
-                },
-                cancellationToken);
+                    Text = processedFirstCommentTextForIndex.Trim()
+                };
+            }
+            else
+            {
+                commentContent = await _commentContentService.ToIndexableContentAsync(
+                    oldestComment.Content,
+                    new CommentContentRequest
+                    {
+                        ProcessImages = processImages,
+                        ImageCacheMode = ImageExtractionCacheMode.UseAndRefresh,
+                        RefreshImageTextCache = processImages,
+                        TicketId = ticket.Id,
+                        TicketActionId = oldestComment.Id,
+                        TeamSupportActionId = oldestComment.TeamSupportActionId,
+                        TeamSupportTicketId = ticket.TeamSupportId
+                    },
+                    cancellationToken);
+            }
 
             if (!string.IsNullOrWhiteSpace(commentContent.Text))
             {
@@ -159,6 +172,7 @@ public class TicketIngestionService : ITicketIngestionService
     private async Task SyncFirstCommentIndexAsync(
         Ticket ticket,
         bool processImages,
+        string? processedFirstCommentTextForIndex,
         CancellationToken cancellationToken)
     {
         try
@@ -170,7 +184,8 @@ public class TicketIngestionService : ITicketIngestionService
                     ProcessImages = processImages,
                     SkipAlreadyIndexed = false,
                     OnlyKnowledgeBaseTickets = null,
-                    RebuildAll = true
+                    RebuildAll = true,
+                    ProcessedCommentTextForIndex = processedFirstCommentTextForIndex
                 },
                 cancellationToken);
 

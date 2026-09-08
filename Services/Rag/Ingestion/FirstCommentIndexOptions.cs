@@ -9,4 +9,5 @@ public class FirstCommentIndexOptions
     public int? MaxTickets { get; init; }
     public DateTime? TicketCreatedFrom { get; init; }
     public DateTime? TicketCreatedTo { get; init; }
+    public string? ProcessedCommentTextForIndex { get; init; }
 }

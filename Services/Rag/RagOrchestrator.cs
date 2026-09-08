@@ -32,6 +32,9 @@ public class RagOrchestrator : IRagOrchestrator
     public const string DefaultGenerationQuestion =
         "Redacta un mensaje de respuesta para el cliente que resuelva o oriente sobre el problema descrito en su comentario inicial.";
 
+    public const string AgentGenerationQuestion =
+        "Elabora una guía interna para el agente de soporte con pasos concretos de diagnóstico y resolución del problema descrito en el comentario inicial del cliente.";
+
     public const string KnowledgeBasePromptVersion = "kb-solution-v1";
 
     private readonly IRetrievalService _retrievalService;
@@ -161,12 +164,18 @@ public class RagOrchestrator : IRagOrchestrator
                 cancellationToken);
         }
 
-        var answer = await _generationService.GenerateAnswerAsync(
-            DefaultGenerationQuestion,
-            gptContextText,
-            request.TicketNumber,
-            firstComment.Content,
+        var generation = await _generationService.GenerateAnswerAsync(
+            new GenerateAnswerRequest
+            {
+                Question = DefaultGenerationQuestion,
+                Context = gptContextText,
+                CurrentTicketNumber = request.TicketNumber,
+                CurrentTicketFirstComment = firstComment.Content,
+                TicketId = request.TicketId
+            },
             cancellationToken);
+
+        var answer = generation.Answer;
 
         var gptLog = request.SkipQueryLog
             ? null
@@ -174,10 +183,10 @@ public class RagOrchestrator : IRagOrchestrator
             {
                 UserId = userId,
                 TicketId = request.TicketId,
-                Question = $"{DefaultGenerationQuestion} (ticket #{request.TicketNumber})",
+                Question = $"{generation.GenerationQuestion} (ticket #{request.TicketNumber})",
                 Answer = answer,
                 Context = gptContextText,
-                PromptVersion = OpenAiGenerationService.PromptVersion,
+                PromptVersion = generation.PromptVersion,
                 ResponseType = RagResponseType.Gpt
             }, cancellationToken: cancellationToken);
 
@@ -224,7 +233,8 @@ public class RagOrchestrator : IRagOrchestrator
             GptTeamSupportActionId = skipTeamSupportActionInsert ? null : actionInsertResult.ActionId,
             GptTeamSupportActionWarning = skipTeamSupportActionInsert || actionInsertResult.Success
                 ? null
-                : actionInsertResult.ErrorMessage
+                : actionInsertResult.ErrorMessage,
+            GptPromptTemplateCode = generation.TemplateCode
         };
     }
 
@@ -382,19 +392,23 @@ public class RagOrchestrator : IRagOrchestrator
             contextItems,
             cancellationToken);
 
-        var answer = await _generationService.GenerateAnswerAsync(
-            DefaultGenerationQuestion,
-            gptContextText,
-            ticketNumber,
-            firstComment.Content,
+        var generation = await _generationService.GenerateAnswerAsync(
+            new GenerateAnswerRequest
+            {
+                Question = DefaultGenerationQuestion,
+                Context = gptContextText,
+                CurrentTicketNumber = ticketNumber,
+                CurrentTicketFirstComment = firstComment.Content,
+                TicketId = ticketId
+            },
             cancellationToken);
 
         return new RagThresholdComparisonColumnViewModel
         {
             MinScore = minScore,
             ContextItems = contextItems,
-            Answer = answer,
-            HasGptAnswer = !string.IsNullOrWhiteSpace(answer)
+            Answer = generation.Answer,
+            HasGptAnswer = !string.IsNullOrWhiteSpace(generation.Answer)
         };
     }
 

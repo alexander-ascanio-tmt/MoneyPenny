@@ -1,0 +1,34 @@
+@model MoneyPenny.Models.Rag.UrgencyRule
+
+
+
+@{
+
+    ViewData["Title"] = "Eliminar frase de urgencia";
+
+}
+
+
+
+<h2 class="mb-3 text-danger">@ViewData["Title"]</h2>
+
+
+
+<div class="alert alert-warning border-0 shadow-sm">
+
+    ¿Eliminar la frase <strong>@Model.Phrase</strong>?
+
+</div>
+
+
+
+<form asp-action="Delete" method="post">
+
+    <input type="hidden" asp-for="Id" />
+
+    <button type="submit" class="btn btn-danger">Eliminar</button>
+
+    <a asp-action="Index" class="btn btn-outline-secondary">Cancelar</a>
+
+</form>
+

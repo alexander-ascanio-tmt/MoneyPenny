@@ -1,0 +1,62 @@
+@model MoneyPenny.Models.Rag.UrgencyDetectionConfig
+
+
+
+@{
+
+    ViewData["Title"] = "Instrucciones de urgencia (IA)";
+
+}
+
+
+
+<h2 class="mb-3">@ViewData["Title"]</h2>
+
+<p class="text-muted">Criterios de negocio que se añaden al prompt al clasificar urgencia del comentario #1.</p>
+
+
+
+@if (TempData["SuccessMessage"] is string success)
+
+{
+
+    <div class="alert alert-success border-0 shadow-sm">@success</div>
+
+}
+
+
+
+<div class="row">
+
+    <div class="col-lg-8">
+
+        <div class="card border-0 shadow-sm">
+
+            <div class="card-body">
+
+                <form asp-action="Config" method="post">
+
+                    <input type="hidden" asp-for="Id" />
+
+                    <div class="mb-3">
+
+                        <label asp-for="PromptText" class="form-label">Instrucciones</label>
+
+                        <textarea asp-for="PromptText" class="form-control" rows="12"></textarea>
+
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+
+                    <a asp-action="Index" class="btn btn-outline-secondary">Volver a frases</a>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+

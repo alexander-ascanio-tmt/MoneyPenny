@@ -12,5 +12,6 @@ public interface ITicketIngestionService
     Task<TicketIndexResult> IndexTicketAsync(
         int ticketId,
         bool processImages = true,
+        string? processedFirstCommentTextForIndex = null,
         CancellationToken cancellationToken = default);
 }

@@ -1,5 +1,5 @@
 ---
-description: Modo consulta — Pregunta/Consulta sin cambios hasta «terminar consulta»
+description: Modo consulta — Pregunta/Consulta/Comentario sin cambios hasta «terminar consulta»
 alwaysApply: true
 ---
 
@@ -11,10 +11,12 @@ Si un mensaje del usuario **empieza por** alguno de estos prefijos (mayúsculas/
 
 - `Pregunta:`
 - `Consulta:`
+- `Comentario:`
 - `Una pregunta:`
 - `Una consulta:`
+- `Un comentario:`
 
-También cuenta si el mensaje empieza por una variante cercana del mismo sentido (p. ej. `(Consulta)` / `Una pregunta (no hagas cambios)`), siempre que deje claro que es pregunta/consulta y no una petición de implementación.
+También cuenta si el mensaje empieza por una variante cercana del mismo sentido (p. ej. `(Consulta)` / `Una pregunta (no hagas cambios)` / `Comentario (sin cambios)`), siempre que deje claro que es pregunta/consulta/comentario y no una petición de implementación.
 
 ## Persistencia
 
@@ -38,6 +40,7 @@ Hasta entonces, tratar **todos** los mensajes como consulta.
 ## Ejemplos
 
 - `Una pregunta: ¿cómo funciona el RAG aquí?` → modo consulta; solo explicación.
+- `Comentario: este flujo me parece confuso` → modo consulta; solo opinión/aclaración, sin cambios.
 - Siguiente mensaje: `¿y los embeddings?` → sigue en modo consulta (sin prefijo).
 - `terminar consulta` → sale del modo; a partir de ahí sí se pueden hacer cambios si lo pide.
 - `Añade un botón para X` (sin haber activado consulta, o tras `terminar consulta`) → modo normal; sí se pueden hacer cambios.

@@ -61,4 +61,5 @@ public class RagResponseViewModel
     public string? GptTeamSupportActionId { get; set; }
     public string? GptTeamSupportActionWarning { get; set; }
     public GptTeamSupportActionViewModel? InsertedTeamSupportAction { get; set; }
+    public string? GptPromptTemplateCode { get; set; }
 }

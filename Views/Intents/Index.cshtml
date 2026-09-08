@@ -1,0 +1,77 @@
+@model IEnumerable<MoneyPenny.Models.Rag.TicketIntent>
+
+@{
+    ViewData["Title"] = "Intenciones";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h2 class="mb-1"><i class="bi bi-bullseye me-2 text-primary"></i>@ViewData["Title"]</h2>
+        <p class="text-muted mb-0 small">Catálogo de intenciones del comentario #1 (Admin → Maestros).</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="Config" class="btn btn-outline-secondary">
+            <i class="bi bi-chat-left-text me-1"></i> Clasificación IA
+        </a>
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i> Nueva intención
+        </a>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] is string success)
+{
+    <div class="alert alert-success border-0 shadow-sm">@success</div>
+}
+@if (TempData["WarningMessage"] is string warning)
+{
+    <div class="alert alert-warning border-0 shadow-sm">@warning</div>
+}
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Orden</th>
+                    <th>Código</th>
+                    <th>Nombre</th>
+                    <th>Descripción</th>
+                    <th>Estado</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in Model)
+            {
+                <tr>
+                    <td>@item.SortOrder</td>
+                    <td><code>@item.Code</code></td>
+                    <td>@item.Name</td>
+                    <td class="text-muted small">@(item.Description ?? "—")</td>
+                    <td>
+                        @if (item.IsActive)
+                        {
+                            <span class="badge text-bg-success">Activa</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-secondary">Inactiva</span>
+                        }
+                    </td>
+                    <td class="text-end">
+                        <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-primary">Editar</a>
+                        <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-outline-danger">Eliminar</a>
+                    </td>
+                </tr>
+            }
+            @if (!Model.Any())
+            {
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">No hay intenciones.</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
